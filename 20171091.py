@@ -393,6 +393,43 @@ def applycond(jt,fh,fh2,cond,opused,andor):
 
 
 
+def selectpreprocess(s):
+    """
+    Remove leading and trailing spaces from attributes
+    """
+
+    s=s.split(',')
+    for i in range(len(s)):
+        s[i]=s[i].strip()
+    s=",".join(s)
+    return s
+
+
+
+def checkagg(att,temp):
+    """
+    Check if aggregate functions used or not
+    """
+
+    agg=[]
+    aggarray=["max()","min()","sum()","avg()"]
+    if(len(att)>5):
+        a=att[0:4]
+        a+=att[-1]
+        if a in aggarray:
+            #if more than 1 col selected for projection
+            if(len(temp)!=1):
+                print("Error: error in aggregate function")
+                exit(-1)    
+
+            att=att[4:]
+            att=att[:-1]
+            agg.append(a)
+
+    return [att,agg]
+
+
+
 def checkselect(query,fh,fh2,distinct):
     """
     Check if select statement is correct or not
@@ -402,17 +439,48 @@ def checkselect(query,fh,fh2,distinct):
         return ["*"]
     else:
         temp=query[1+distinct].split(",")
-        for att in temp:
+        for i in range(len(temp)):
+            
+            att=temp[i]
+            att,agg=checkagg(att,temp)
+            temp[i]=att
+
             if (fh.count(att)!=1) and (fh2.count(att)!=1):
                 print("Error: attributes not specified properly in select clause")
                 exit(-1)
+
         for i in range(len(temp)):
             temp[i]=processatt(temp[i],fh,fh2)
-        return temp
+
+        return [temp,agg]
 
 
 
-def printresult(fh,ans,distinct,cols):
+def avg(x):
+    """
+    Return avg of list elements
+    """
+    
+    return(sum(x)/len(x))
+
+
+
+def printagg(agg,arr):
+    """
+    Apply aggregate functin and then print
+    """
+
+    for i in range(len(arr)):
+        arr[i]=int(arr[i][0])
+
+    exp=agg[0][:-1]
+    exp+=str(arr)+")"
+
+    print(eval(exp))
+
+
+
+def printresult(fh,ans,distinct,cols,agg):
     """
     Print query result
     """
@@ -441,9 +509,14 @@ def printresult(fh,ans,distinct,cols):
             index.append(findindex(att,fh))
         
         #print col names
-        for i in index:
-            print(fh[i],end=' ')
-        print()
+        if(len(agg)==0):
+            for i in index:
+                print(fh[i],end=' ')
+            print()
+        else:
+            a=str(fh[index[0]])
+            b=agg[0]
+            print(b[0:4]+a+')')
 
         #extract cols from joined table
         ans2=[]
@@ -458,11 +531,17 @@ def printresult(fh,ans,distinct,cols):
             for i in ans2:
                 if i not in uniqans2:
                     uniqans2.append(i)
-            for i in uniqans2:
-                print(i)
+            if(len(agg)==0):
+                for i in uniqans2:
+                    print(i)
+            else:
+                printagg(agg,uniqans2)
         else:
-            for i in ans2:
-                print(i)
+            if(len(agg)==0):
+                for i in ans2:
+                    print(i)
+            else:
+                printagg(agg,ans2)
 
 
 
@@ -478,8 +557,6 @@ def processquery(q,tinfo):
         if(str(i)!=' '):
             query.append(str(i))
 
-    # print(query)
-    # exit(-1)
 
     #check if distinct present
     distinct=checkdistinct(query)
@@ -499,10 +576,11 @@ def processquery(q,tinfo):
     ans=applycond(jt,fh,fh2,cond,opused,andor)
 
     #process select clause
-    cols=checkselect(query,fh,fh2,distinct)
-    
+    query[1+distinct]=selectpreprocess(query[1+distinct])
+    cols,agg=checkselect(query,fh,fh2,distinct)
+
     #print
-    printresult(fh,ans,distinct,cols)
+    printresult(fh,ans,distinct,cols,agg)
     
 
 
