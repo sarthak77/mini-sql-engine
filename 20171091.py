@@ -26,18 +26,7 @@ def init():
         elif(line!="<end_table>"):
             tinfo[name][line]=[]
 
-    # print(tinfo)
-
     for tname in tinfo:
-        
-        # print(tname)
-
-        s=""
-        for att in tinfo[tname]:
-            s+=tname+'.'+att+','
-        s=s[:-1]
-        # print(s) 
-        
         with open(basedr+tname+'.csv','r') as csvfile:
             csvreader=csv.reader(csvfile)
 
@@ -47,8 +36,8 @@ def init():
                     tinfo[tname][att].append(record[ind])
                     ind+=1
             
-    # print(tinfo)
     return tinfo
+
 
 
 def checkdistinct(query):
@@ -68,19 +57,23 @@ def checkincorrect(query,distinct):
     Checks if error in sql syntax
     """
     
+    flag=True
+
     if not(6>=len(query)>=4):
-        return True
+        flag=False
 
     if(query[0]!='select'):
-        return True
+        flag=False
 
     if(query[2+distinct]!='from'):
-        return True
+        flag=False
     
     if(4+distinct<len(query)) and (query[4+distinct][0:6]!='where '):
-        return True
+        flag=False
 
-    return False
+    if not flag:
+        print("Incorrect SQL syntax")
+        exit(-1)
 
 
 
@@ -93,9 +86,7 @@ def gettables(query,distinct):
         tables=query[3+distinct].split(",")
         for i in range(len(tables)):
             tables[i]=tables[i].strip()
-
         return tables        
-
     except:
         print("Incorrect SQL syntax")
         exit(-1)
@@ -123,20 +114,12 @@ def jointable(tables,tinfo):
     Joins all tables which are mentioned in from
     """
 
-    #return if only 1 table
-    if(len(tables)==1):
-        return [tables,[],[]]
-
-    # ----------------------------------
-    #|preprocessing for cumulative joins|
-    # ----------------------------------
-
-    fields=[]#stores col name like table1.A
-    fields2=[]#stores col name like A
+    fields=[]#stores col name like tablename.attribute
+    fields2=[]#stores col name like attribute
     aux2=[]#stores list after converting aux to a list
     aux=tinfo[tables[0]]#cumulative store of joins
 
-    #find no of records in aux
+    #find no of records in aux and append column header
     noraux=0
     for k in aux:
         fields.append(str(tables[0])+'.'+str(k))
@@ -153,7 +136,11 @@ def jointable(tables,tinfo):
     #copy aux2 back to aux
     aux=aux2
 
-    #start the loop
+    #return if only 1 table
+    if(len(tables)==1):
+        return [aux,fields,fields2]
+
+    #for multiple tables
     for i in range(1,len(tables),1):
         aux2=[]#empty aux2 after every iteration
         a=tinfo[tables[i]]#next table
@@ -173,7 +160,6 @@ def jointable(tables,tinfo):
                     row.append(a[j][k])
                 aux2.append(l+row)
 
-
         #copy aux2 back to aux
         aux=aux2
 
@@ -189,21 +175,21 @@ def getcond(query,distinct):
     if(4+distinct<len(query)) and (query[4+distinct][0:6]=='where '):
 
         a=query[4+distinct]
-        a=a[6:]
-        a=a.strip()
+        a=a[6:]#remove "where "
+        a=a.strip()#remove leading and trailing space and convert to list
         
-        #check for and/or
+        #check for and/or in condition
         oparr=[" AND "," and "," OR "," or "]
         for op in oparr:
             if(op in a):
                 a=a.replace(op,',')
                 a=a.split(',')
-                # print(a)
                 return [a,op.split()]
 
         #if no and/or return cond after removing where
         return [a.split(),[]]
 
+    #if no where clause then return empty lists
     return [[],[]]
 
 
@@ -218,7 +204,6 @@ def checkcond(cond,fh,fh2,tables):
 
     #check for condition syntax
     for i in cond:
-
         correct=False
         #if any one op present in cond then correct
         for j in oparr:
@@ -226,38 +211,55 @@ def checkcond(cond,fh,fh2,tables):
                 correct=True
                 opused.append(j)
                 break
-        if(not correct):
+        if not correct:
             print("Error:operator in where clause not specified")
             exit(-1)
         
     #check if attributes specified exist or not
     for i in range(len(cond)):
-        cond[i]=cond[i].replace(opused[i],',')
-        a=cond[i].split(',')
+        cond[i]=cond[i].replace(opused[i],',')#replace op with comma
+        a=cond[i].split(',')#convert to list
+
+        #convert str(int) to int        
+        for i in range(len(a)):
+            try:
+                a[i]=int(a[i])
+            except:
+                pass
 
         #check in fh and fh2
         for att in a:
-            if (fh.count(att)!=1) and (fh2.count(att)!=1):
-                print("Error: attributes not specified properly in where clause")
-                exit(-1)
+            if(isinstance(att,str)):
+                if (fh.count(att)!=1) and (fh2.count(att)!=1):
+                    print("Error: attributes not specified properly in where clause")
+                    exit(-1)
+            else:
+                pass
 
     return opused
 
 
 
 def processatt(att,fh,fh2):
+    """
+    Converts attribute from att to tablename.att
+    """
+
     if att not in fh:
         for i in fh:
             i=i.split(".")[0]
             i=str(i)+'.'+str(att)
             if(i in fh):
                 return i
-
     return att
 
 
 
 def findindex(att,fh):
+    """
+    Find index of att in fh
+    """
+
     for i in range(len(fh)):
         if(att==fh[i]):
             return i
@@ -265,21 +267,73 @@ def findindex(att,fh):
 
 
 def returnindex(cond,fh,fh2):
+    """
+    Returns index of attributes used in cond
+    """
 
-        cond=cond.split(",")
+    cond=cond.split(",")
+    for i in range(len(cond)):
+        try:
+            cond[i]=int(cond[i])
+        except:
+            pass
 
-        a1=cond[0]
-        a2=cond[1]
-        
+    #get attributes
+    #convert to standard form
+    #find index in fh
+
+    a1=cond[0]
+    if(isinstance(a1,str)):
         a1=processatt(a1,fh,fh2)
-        a2=processatt(a2,fh,fh2)
-        # print(a1,a2)
-        
         a1=findindex(a1,fh)
+    else:
+        a1="-1"+str(a1)
+        a1=int(a1)
+
+    a2=cond[1]
+    if(isinstance(a2,str)):
+        a2=processatt(a2,fh,fh2)
         a2=findindex(a2,fh)
-        # print(fh)
-        # print(a1,a2)
-        return[a1,a2]
+    else:
+        a2="-1"+str(a2)
+        a2=int(a2)
+
+    return[a1,a2]
+
+
+
+def checkexpr(a1,a2,i,opused):
+    """
+    Generates expression according to condition
+    """
+
+    #both are attributes
+    if(a1>=0 and a2>=0):
+        return str(i[a1])+str(opused)+str(i[a2])
+
+    #a2 is number
+    elif(a1>=0 and a2<0):
+        a3=str(a2)
+        a3=a3[2:]
+        a3=int(a3)
+        return str(i[a1])+str(opused)+str(a3)
+    
+    #a1 is number
+    elif(a1<0 and a2>=0):
+        a4=str(a1)
+        a4=a4[2:]
+        a4=int(a4)
+        return str(a4)+str(opused)+str(i[a2])
+    
+    #both are numbers
+    else:
+        a3=str(a2)
+        a3=a3[2:]
+        a3=int(a3)
+        a4=str(a1)
+        a4=a4[2:]
+        a4=int(a4)
+        return str(a4)+str(opused)+str(a3)
 
 
 
@@ -288,19 +342,32 @@ def applycond(jt,fh,fh2,cond,opused,andor):
     remove records form joined table if they do not meet conditions
     """
     
-    if(len(andor)==0):
-        a1=returnindex(cond[0],fh,fh2)[0]
-        a2=returnindex(cond[0],fh,fh2)[1]
+    #convert = to == for evaluating
+    for i in range(len(opused)):
+        if(opused[i]=="="):
+            opused[i]="=="
 
+    #if no where clause
+    if(len(cond)==0):
         ans=[]
         for i in jt:
-            temp=str(i[a1])+str(opused[0])+str(i[a2])
+            ans.append(i)
+        return ans
+    
+    #if no and/or in where clause
+    elif(len(andor)==0 and len(cond)!=0):
+        a1,a2=returnindex(cond[0],fh,fh2)
+        ans=[]
+        for i in jt:
+            temp=checkexpr(a1,a2,i,opused[0])
             if eval(temp):
-                ans.append(i)
+                ans.append(i)#if cond sattisfied then append
         return ans
 
+    #if and/or in where clause
     elif(len(andor)==1):
 
+        #process and/or
         andor=''.join(andor)
         andor=andor.lower()
         andor=' '+str(andor)+' '
@@ -313,11 +380,9 @@ def applycond(jt,fh,fh2,cond,opused,andor):
 
         ans=[]
         for i in jt:
-            temp=str(i[a1])+str(opused[0])+str(i[a2])
-            temp2=str(i[b1])+str(opused[1])+str(i[b2])
+            temp=checkexpr(a1,a2,i,opused[0])
+            temp2=checkexpr(b1,b2,i,opused[1])
             temp3=str(temp)+str(andor)+str(temp2)
-            # print(temp3)
-
             if eval(temp3):
                 ans.append(i)
         return ans
@@ -328,50 +393,77 @@ def applycond(jt,fh,fh2,cond,opused,andor):
 
 
 
-def checkselect(query,fh,fh2):
+def checkselect(query,fh,fh2,distinct):
+    """
+    Check if select statement is correct or not
+    """
 
-    if(query[1]=="*"):
+    if(query[1+distinct]=="*"):
         return ["*"]
-
     else:
-        temp=query[1].split(",")
-
+        temp=query[1+distinct].split(",")
         for att in temp:
             if (fh.count(att)!=1) and (fh2.count(att)!=1):
                 print("Error: attributes not specified properly in select clause")
                 exit(-1)
-
         for i in range(len(temp)):
             temp[i]=processatt(temp[i],fh,fh2)
-
-        # print(temp)
         return temp
 
 
 
 def printresult(fh,ans,distinct,cols):
-
-    if(distinct==1):
-        ans=list(dict.fromkeys(ans))
+    """
+    Print query result
+    """
 
     if(cols==["*"]):
+        
+        #print col names
         print(fh)
-        for i in ans:
-            print(i)
+
+        #check if distinct present
+        if(distinct==1):
+            uniqans=[]
+            for i in ans:
+                if i not in uniqans:
+                    uniqans.append(i)
+            for i in uniqans:
+                print(i)
+        else:
+            for i in ans:
+                print(i)
+
     else:
+        #get index of attributes present in query
         index=[]
         for att in cols:
             index.append(findindex(att,fh))
-
+        
+        #print col names
         for i in index:
             print(fh[i],end=' ')
         print()
 
+        #extract cols from joined table
+        ans2=[]
         for record in ans:
+            tr=[]
             for i in index:
-                print(record[i],end=' ')
-            print()
-        
+                tr.append(record[i])
+            ans2.append(tr)
+
+        if(distinct==1):
+            uniqans2=[]
+            for i in ans2:
+                if i not in uniqans2:
+                    uniqans2.append(i)
+            for i in uniqans2:
+                print(i)
+        else:
+            for i in ans2:
+                print(i)
+
 
 
 def processquery(q,tinfo):
@@ -379,8 +471,6 @@ def processquery(q,tinfo):
     Process the given query
     """
 
-    # q="select max(A),table1.B,table2.C from table1,table2 where table1.A=table2.B and C=5"
-  
     #convert query to a list
     temp=sqlparse.parse(q)[0].tokens
     query=[]
@@ -388,15 +478,15 @@ def processquery(q,tinfo):
         if(str(i)!=' '):
             query.append(str(i))
 
+    # print(query)
+    # exit(-1)
+
     #check if distinct present
     distinct=checkdistinct(query)
     distinct=int(distinct)
 
     #check if incorrect
     incorrect=checkincorrect(query,distinct)
-    if(incorrect):
-        print("Incorrect SQL syntax")
-        exit(-1)
 
     #process from clause
     tables=gettables(query,distinct)
@@ -409,7 +499,7 @@ def processquery(q,tinfo):
     ans=applycond(jt,fh,fh2,cond,opused,andor)
 
     #process select clause
-    cols=checkselect(query,fh,fh2)
+    cols=checkselect(query,fh,fh2,distinct)
     
     #print
     printresult(fh,ans,distinct,cols)
@@ -418,22 +508,19 @@ def processquery(q,tinfo):
 
 if __name__ == "__main__":
 
-    # store tables in dictionary
+    #store tables in dictionary
     tinfo=init()
 
-    # take command line inputs
+    #take command line inputs
     if(len(sys.argv)!=2):
         print("ERROR: Incorrect usage")
         print("USAGE: python3 20171091.py <sql-query>")
     else:
         try:
             q=sys.argv[1]
-            
             if(len(q)==0):
-                print("Incorrect SQL syntax")
+                print("Error: enter a non-empty query")
                 exit(-1)
-
             processquery(q,tinfo)
-
         except Exception:
             traceback.print_exc()
