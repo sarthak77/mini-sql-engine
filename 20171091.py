@@ -72,7 +72,7 @@ def checkincorrect(query,distinct):
         flag=False
 
     if not flag:
-        print("Incorrect SQL syntax")
+        print("Error: Incorrect SQL syntax")
         exit(-1)
 
 
@@ -88,7 +88,7 @@ def gettables(query,distinct):
             tables[i]=tables[i].strip()
         return tables        
     except:
-        print("Incorrect SQL syntax")
+        print("Error: From clause not parsed")
         exit(-1)
       
 
@@ -104,7 +104,7 @@ def checktables(tables):
 
     for i in tables:
         if(i not in tablelist):
-            print("Error: Tables not present")
+            print("Error: Tables specified not present in database")
             exit(-1)
 
 
@@ -177,17 +177,17 @@ def getcond(query,distinct):
         a=query[4+distinct]
         a=a[6:]#remove "where "
         a=a.strip()#remove leading and trailing space and convert to list
-        
+
         #check for and/or in condition
         oparr=[" AND "," and "," OR "," or "]
         for op in oparr:
             if(op in a):
                 a=a.replace(op,',')
                 a=a.split(',')
-                return [a,op.split()]
+                return [a[0:2],op.split()]
 
         #if no and/or return cond after removing where
-        return [a.split(),[]]
+        return [a.split(','),[]]
 
     #if no where clause then return empty lists
     return [[],[]]
@@ -212,7 +212,7 @@ def checkcond(cond,fh,fh2,tables):
                 opused.append(j)
                 break
         if not correct:
-            print("Error:operator in where clause not specified")
+            print("Error: operator in where clause not specified")
             exit(-1)
         
     #check if attributes specified exist or not
@@ -220,6 +220,7 @@ def checkcond(cond,fh,fh2,tables):
         cond[i]=cond[i].replace(opused[i],',')#replace op with comma
         a=cond[i].split(',')#convert to list
 
+        print(a)
         #convert str(int) to int        
         for i in range(len(a)):
             try:
@@ -230,6 +231,7 @@ def checkcond(cond,fh,fh2,tables):
         #check in fh and fh2
         for att in a:
             if(isinstance(att,str)):
+                att=att.strip()
                 if (fh.count(att)!=1) and (fh2.count(att)!=1):
                     print("Error: attributes not specified properly in where clause")
                     exit(-1)
@@ -244,7 +246,7 @@ def preprocessatt(att,fh,fh2):
     """
     Converts attribute from att to tablename.att
     """
-
+    att=att.strip()
     if att not in fh:
         for i in fh:
             i=i.split(".")[0]
@@ -270,7 +272,7 @@ def processatt(att,fh,fh2):
     """
     Handles wether att is int or str
     """
-
+    
     if(isinstance(att,str)):
         att=preprocessatt(att,fh,fh2)
         att=findindex(att,fh)
@@ -447,8 +449,10 @@ def checkselect(query,fh,fh2,distinct):
     Check if select statement is correct or not
     """
 
+    #if select *
     if(query[1+distinct]=="*"):
         return [["*"],[],distinct]
+
     else:
         temp=query[1+distinct].split(",")
         for i in range(len(temp)):
@@ -515,7 +519,7 @@ def niceprint(x,agg):
 
     cellwidth=10
     if(agg==1):
-        cellwidth=15
+        cellwidth=20
 
     #print row seperator
     head=' '
@@ -560,6 +564,8 @@ def printresult(fh,ans,distinct,cols,agg):
         
         #remove duplicate columns
         ans,index=removeduplicate(ans)
+
+        #remove col header of duplicate cols
         for i in index:
             fh.pop(i)
 
@@ -670,13 +676,13 @@ if __name__ == "__main__":
 
     #take command line inputs
     if(len(sys.argv)!=2):
-        print("ERROR: Incorrect usage")
-        print("USAGE: python3 20171091.py <sql-query>")
+        print("Error: Incorrect usage")
+        print("Usage: python3 20171091.py <sql-query>")
     else:
         try:
             q=sys.argv[1]
             if(len(q)==0):
-                print("Error: enter a non-empty query")
+                print("Error: Empty query encountered")
                 exit(-1)
             processquery(q,tinfo)
         except Exception:
