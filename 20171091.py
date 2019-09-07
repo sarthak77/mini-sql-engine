@@ -465,12 +465,67 @@ def checkselect(query,fh,fh2,distinct):
 
 
 
+def removeduplicate(ans):
+    """
+    Removes dupliacte columns before printing
+    """
+
+    if(len(ans)==0):
+        return
+    else:
+        #transpose
+        ans=list(zip(*ans))
+
+        #get unique
+        uniqans=[]
+        index=[]
+        for i in range(len(ans)):
+            if ans[i] not in uniqans:
+                uniqans.append(ans[i])
+            else:
+                index.append(i)
+
+        #transpose back
+        uniqans=list(zip(*uniqans))
+
+        #convert to list
+        for i in range(len(uniqans)):
+            uniqans[i]=list(uniqans[i])
+
+        return uniqans,index
+
+
+
 def avg(x):
     """
     Return avg of list elements
     """
     
     return(sum(x)/len(x))
+
+
+
+def niceprint(x):
+    """
+    Prints a 1D list in a good way
+    """
+
+    cellwidth=10
+    #print row seperator
+    head=' '
+    for i in range(len(x)):
+        head+='-'*cellwidth
+        head+=' '
+    print(head)
+
+    #print each record
+    print('|',end='')
+    for i in x:
+        i=i.center(cellwidth)#ljust,rjust,center
+        print(i,end='|')
+
+    #print newline after each record
+    print()
 
 
 
@@ -485,7 +540,7 @@ def printagg(agg,arr):
     exp=agg[0][:-1]
     exp+=str(arr)+")"
 
-    print(eval(exp))
+    niceprint([eval(exp)])
 
 
 
@@ -493,11 +548,16 @@ def printresult(fh,ans,distinct,cols,agg):
     """
     Print query result
     """
-
+    
     if(cols==["*"]):
         
+        #remove duplicate columns
+        ans,index=removeduplicate(ans)
+        for i in index:
+            fh.pop(i)
+
         #print col names
-        print(fh)
+        niceprint(fh)
 
         #check if distinct present
         if(distinct==1):
@@ -506,10 +566,10 @@ def printresult(fh,ans,distinct,cols,agg):
                 if i not in uniqans:
                     uniqans.append(i)
             for i in uniqans:
-                print(i)
+                niceprint(i)
         else:
             for i in ans:
-                print(i)
+                niceprint(i)
 
     else:
         #get index of attributes present in query
@@ -519,13 +579,16 @@ def printresult(fh,ans,distinct,cols,agg):
         
         #print col names
         if(len(agg)==0):
+            temp=[]
             for i in index:
-                print(fh[i],end=' ')
-            print()
+                temp.append(fh[i])
+            niceprint(temp)
+
         else:
             a=str(fh[index[0]])
             b=agg[0]
-            print(b[0:4]+a+')')
+            b=b[0:4]+a+')'
+            niceprint([b])
 
         #extract cols from joined table
         ans2=[]
@@ -542,13 +605,13 @@ def printresult(fh,ans,distinct,cols,agg):
                     uniqans2.append(i)
             if(len(agg)==0):
                 for i in uniqans2:
-                    print(i)
+                    niceprint(i)
             else:
                 printagg(agg,uniqans2)
         else:
             if(len(agg)==0):
                 for i in ans2:
-                    print(i)
+                    niceprint(i)
             else:
                 printagg(agg,ans2)
 
@@ -572,7 +635,7 @@ def processquery(q,tinfo):
     distinct=int(distinct)
 
     #check if incorrect
-    incorrect=checkincorrect(query,distinct)
+    checkincorrect(query,distinct)
 
     #process from clause
     tables=gettables(query,distinct)
