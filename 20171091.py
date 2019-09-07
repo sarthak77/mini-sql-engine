@@ -406,11 +406,11 @@ def selectpreprocess(s):
 
 
 
-def checkagg(att,temp):
+def checkagg(att,temp,distinct):
     """
     Check if aggregate functions used or not
     """
-
+    
     agg=[]
     aggarray=["max()","min()","sum()","avg()"]
     if(len(att)>5):
@@ -422,11 +422,20 @@ def checkagg(att,temp):
                 print("Error: error in aggregate function")
                 exit(-1)    
 
+            #remove aggregate from att name
             att=att[4:]
             att=att[:-1]
+            
+            #check for distinct in att name
+            att=att.strip()
+            if(att[0:9]=="distinct "):
+                distinct=1
+                att=att[9:]
+                att=att.strip()
+
             agg.append(a)
 
-    return [att,agg]
+    return [att,agg,distinct]
 
 
 
@@ -436,13 +445,13 @@ def checkselect(query,fh,fh2,distinct):
     """
 
     if(query[1+distinct]=="*"):
-        return ["*"]
+        return [["*"],[],distinct]
     else:
         temp=query[1+distinct].split(",")
         for i in range(len(temp)):
             
             att=temp[i]
-            att,agg=checkagg(att,temp)
+            att,agg,distinct=checkagg(att,temp,distinct)
             temp[i]=att
 
             if (fh.count(att)!=1) and (fh2.count(att)!=1):
@@ -452,7 +461,7 @@ def checkselect(query,fh,fh2,distinct):
         for i in range(len(temp)):
             temp[i]=processatt(temp[i],fh,fh2)
 
-        return [temp,agg]
+        return [temp,agg,distinct]
 
 
 
@@ -577,7 +586,7 @@ def processquery(q,tinfo):
 
     #process select clause
     query[1+distinct]=selectpreprocess(query[1+distinct])
-    cols,agg=checkselect(query,fh,fh2,distinct)
+    cols,agg,distinct=checkselect(query,fh,fh2,distinct)
 
     #print
     printresult(fh,ans,distinct,cols,agg)
