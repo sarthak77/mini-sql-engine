@@ -240,7 +240,7 @@ def checkcond(cond,fh,fh2,tables):
 
 
 
-def processatt(att,fh,fh2):
+def preprocessatt(att,fh,fh2):
     """
     Converts attribute from att to tablename.att
     """
@@ -266,6 +266,22 @@ def findindex(att,fh):
 
 
 
+def processatt(att,fh,fh2):
+    """
+    Handles wether att is int or str
+    """
+
+    if(isinstance(att,str)):
+        att=preprocessatt(att,fh,fh2)
+        att=findindex(att,fh)
+    else:
+        att="-1"+str(att)
+        att=int(att)
+
+    return att
+
+
+
 def returnindex(cond,fh,fh2):
     """
     Returns index of attributes used in cond
@@ -278,27 +294,22 @@ def returnindex(cond,fh,fh2):
         except:
             pass
 
-    #get attributes
-    #convert to standard form
-    #find index in fh
-
-    a1=cond[0]
-    if(isinstance(a1,str)):
-        a1=processatt(a1,fh,fh2)
-        a1=findindex(a1,fh)
-    else:
-        a1="-1"+str(a1)
-        a1=int(a1)
-
-    a2=cond[1]
-    if(isinstance(a2,str)):
-        a2=processatt(a2,fh,fh2)
-        a2=findindex(a2,fh)
-    else:
-        a2="-1"+str(a2)
-        a2=int(a2)
+    a1=processatt(cond[0],fh,fh2)
+    a2=processatt(cond[1],fh,fh2)
 
     return[a1,a2]
+
+
+
+def processnum(a):
+    """
+    Remove leading identifier(-1)
+    """
+    
+    att=str(a)
+    att=att[2:]
+    att=int(att)
+    return att
 
 
 
@@ -313,26 +324,18 @@ def checkexpr(a1,a2,i,opused):
 
     #a2 is number
     elif(a1>=0 and a2<0):
-        a3=str(a2)
-        a3=a3[2:]
-        a3=int(a3)
+        a3=processnum(a2)
         return str(i[a1])+str(opused)+str(a3)
     
     #a1 is number
     elif(a1<0 and a2>=0):
-        a4=str(a1)
-        a4=a4[2:]
-        a4=int(a4)
+        a4=processnum(a1)
         return str(a4)+str(opused)+str(i[a2])
     
     #both are numbers
     else:
-        a3=str(a2)
-        a3=a3[2:]
-        a3=int(a3)
-        a4=str(a1)
-        a4=a4[2:]
-        a4=int(a4)
+        a3=processnum(a2)
+        a4=processnum(a1)
         return str(a4)+str(opused)+str(a3)
 
 
@@ -459,7 +462,7 @@ def checkselect(query,fh,fh2,distinct):
                 exit(-1)
 
         for i in range(len(temp)):
-            temp[i]=processatt(temp[i],fh,fh2)
+            temp[i]=preprocessatt(temp[i],fh,fh2)
 
         return [temp,agg,distinct]
 
@@ -471,7 +474,7 @@ def removeduplicate(ans):
     """
 
     if(len(ans)==0):
-        return
+        return [[],[]]
     else:
         #transpose
         ans=list(zip(*ans))
@@ -492,7 +495,7 @@ def removeduplicate(ans):
         for i in range(len(uniqans)):
             uniqans[i]=list(uniqans[i])
 
-        return uniqans,index
+        return [uniqans,index]
 
 
 
@@ -505,12 +508,15 @@ def avg(x):
 
 
 
-def niceprint(x):
+def niceprint(x,agg):
     """
     Prints a 1D list in a good way
     """
 
     cellwidth=10
+    if(agg==1):
+        cellwidth=15
+
     #print row seperator
     head=' '
     for i in range(len(x)):
@@ -521,6 +527,7 @@ def niceprint(x):
     #print each record
     print('|',end='')
     for i in x:
+        i=str(i)
         i=i.center(cellwidth)#ljust,rjust,center
         print(i,end='|')
 
@@ -540,7 +547,7 @@ def printagg(agg,arr):
     exp=agg[0][:-1]
     exp+=str(arr)+")"
 
-    niceprint([eval(exp)])
+    niceprint([eval(exp)],1)
 
 
 
@@ -557,7 +564,7 @@ def printresult(fh,ans,distinct,cols,agg):
             fh.pop(i)
 
         #print col names
-        niceprint(fh)
+        niceprint(fh,0)
 
         #check if distinct present
         if(distinct==1):
@@ -566,10 +573,10 @@ def printresult(fh,ans,distinct,cols,agg):
                 if i not in uniqans:
                     uniqans.append(i)
             for i in uniqans:
-                niceprint(i)
+                niceprint(i,0)
         else:
             for i in ans:
-                niceprint(i)
+                niceprint(i,0)
 
     else:
         #get index of attributes present in query
@@ -582,13 +589,13 @@ def printresult(fh,ans,distinct,cols,agg):
             temp=[]
             for i in index:
                 temp.append(fh[i])
-            niceprint(temp)
+            niceprint(temp,0)
 
         else:
             a=str(fh[index[0]])
             b=agg[0]
             b=b[0:4]+a+')'
-            niceprint([b])
+            niceprint([b],1)
 
         #extract cols from joined table
         ans2=[]
@@ -605,13 +612,13 @@ def printresult(fh,ans,distinct,cols,agg):
                     uniqans2.append(i)
             if(len(agg)==0):
                 for i in uniqans2:
-                    niceprint(i)
+                    niceprint(i,0)
             else:
                 printagg(agg,uniqans2)
         else:
             if(len(agg)==0):
                 for i in ans2:
-                    niceprint(i)
+                    niceprint(i,0)
             else:
                 printagg(agg,ans2)
 
