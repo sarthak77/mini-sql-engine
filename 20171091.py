@@ -212,7 +212,7 @@ def checkcond(cond,fh,fh2,tables):
                 opused.append(j)
                 break
         if not correct:
-            print("Error: operator in where clause not specified")
+            print("Error: Operator in where clause not specified")
             exit(-1)
         
     #check if attributes specified exist or not
@@ -220,7 +220,6 @@ def checkcond(cond,fh,fh2,tables):
         cond[i]=cond[i].replace(opused[i],',')#replace op with comma
         a=cond[i].split(',')#convert to list
 
-        print(a)
         #convert str(int) to int        
         for i in range(len(a)):
             try:
@@ -233,7 +232,7 @@ def checkcond(cond,fh,fh2,tables):
             if(isinstance(att,str)):
                 att=att.strip()
                 if (fh.count(att)!=1) and (fh2.count(att)!=1):
-                    print("Error: attributes not specified properly in where clause")
+                    print("Error: Attributes not specified properly in where clause")
                     exit(-1)
             else:
                 pass
@@ -271,14 +270,15 @@ def findindex(att,fh):
 def processatt(att,fh,fh2):
     """
     Handles wether att is int or str
+    If att is num then return str(att)
+    Else return int
     """
     
     if(isinstance(att,str)):
         att=preprocessatt(att,fh,fh2)
         att=findindex(att,fh)
     else:
-        att="-1"+str(att)
-        att=int(att)
+        att=str(att)
 
     return att
 
@@ -303,42 +303,26 @@ def returnindex(cond,fh,fh2):
 
 
 
-def processnum(a):
-    """
-    Remove leading identifier(-1)
-    """
-    
-    att=str(a)
-    att=att[2:]
-    att=int(att)
-    return att
-
-
-
 def checkexpr(a1,a2,i,opused):
     """
     Generates expression according to condition
     """
 
     #both are attributes
-    if(a1>=0 and a2>=0):
+    if isinstance(a1,int) and isinstance(a2,int):
         return str(i[a1])+str(opused)+str(i[a2])
 
-    #a2 is number
-    elif(a1>=0 and a2<0):
-        a3=processnum(a2)
-        return str(i[a1])+str(opused)+str(a3)
+    #a2 is not an attribute
+    elif isinstance(a1,int) and isinstance(a2,str):
+        return str(i[a1])+str(opused)+a2
     
-    #a1 is number
-    elif(a1<0 and a2>=0):
-        a4=processnum(a1)
-        return str(a4)+str(opused)+str(i[a2])
+    #a1 is not an attribute
+    elif isinstance(a1,str) and isinstance(a2,int):
+        return a1+str(opused)+str(i[a2])
     
-    #both are numbers
+    #both are not attributes
     else:
-        a3=processnum(a2)
-        a4=processnum(a1)
-        return str(a4)+str(opused)+str(a3)
+        return a1+str(opused)+a2
 
 
 
@@ -377,11 +361,8 @@ def applycond(jt,fh,fh2,cond,opused,andor):
         andor=andor.lower()
         andor=' '+str(andor)+' '
 
-        a1=returnindex(cond[0],fh,fh2)[0]
-        a2=returnindex(cond[0],fh,fh2)[1]
-
-        b1=returnindex(cond[1],fh,fh2)[0]
-        b2=returnindex(cond[1],fh,fh2)[1]
+        a1,a2=returnindex(cond[0],fh,fh2)
+        b1,b2=returnindex(cond[1],fh,fh2)
 
         ans=[]
         for i in jt:
@@ -424,7 +405,7 @@ def checkagg(att,temp,distinct):
         if a in aggarray:
             #if more than 1 col selected for projection
             if(len(temp)!=1):
-                print("Error: error in aggregate function")
+                print("Error: Error in aggregate function")
                 exit(-1)    
 
             #remove aggregate from att name
@@ -462,7 +443,7 @@ def checkselect(query,fh,fh2,distinct):
             temp[i]=att
 
             if (fh.count(att)!=1) and (fh2.count(att)!=1):
-                print("Error: attributes not specified properly in select clause")
+                print("Error: Attributes not specified properly in select clause")
                 exit(-1)
 
         for i in range(len(temp)):
